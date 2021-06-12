@@ -256,7 +256,9 @@ func serverHandleConnection(s *Server, conn net.Conn, workersCh chan struct{}) {
 		return
 	}
 
+	fmt.Printf("\nSize of Responses channel: %v\n", s.PendingResponses)
 	responsesChan := make(chan *serverMessage, s.PendingResponses)
+
 	stopChan := make(chan struct{})
 
 	readerDone := make(chan struct{})
@@ -409,7 +411,7 @@ func serverWriter(s *Server, w io.Writer, clientAddr string, responsesChan <-cha
 		case m = <-responsesChan:
 		default:
 			// Give the last chance for ready goroutines filling responsesChan :)
-			runtime.Gosched()
+			//runtime.Gosched()
 
 			select {
 			case <-stopChan:
@@ -440,6 +442,8 @@ func serverWriter(s *Server, w io.Writer, clientAddr string, responsesChan <-cha
 		if err := e.Encode(wr); err != nil {
 			s.LogError("gorpc.Server: [%s]->[%s]. Cannot send response to wire: [%s]", clientAddr, s.Addr, err)
 			return
+		}else{
+			fmt.Printf("\nCurrent buffered in rpc writter: %v\n", e.bw.Buffered())
 		}
 		wr.Response = nil
 		wr.Error = ""
