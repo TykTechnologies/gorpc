@@ -411,7 +411,7 @@ func serverWriter(s *Server, w io.Writer, clientAddr string, responsesChan <-cha
 		case m = <-responsesChan:
 		default:
 			// Give the last chance for ready goroutines filling responsesChan :)
-			//runtime.Gosched()
+			runtime.Gosched()
 
 			select {
 			case <-stopChan:
@@ -419,7 +419,9 @@ func serverWriter(s *Server, w io.Writer, clientAddr string, responsesChan <-cha
 			case m = <-responsesChan:
 			case <-flushChan:
 				if err := e.Flush(); err != nil {
-					s.LogError("gorpc.Server: [%s]->[%s]: Cannot flush responses to underlying stream: [%s]", clientAddr, s.Addr, err)
+					if !isServerStop(stopChan) {
+						s.LogError("gorpc.Server: [%s]->[%s]: Cannot flush responses to underlying stream: [%s]", clientAddr, s.Addr, err)
+					}
 					return
 				}
 				flushChan = nil
@@ -442,8 +444,6 @@ func serverWriter(s *Server, w io.Writer, clientAddr string, responsesChan <-cha
 		if err := e.Encode(wr); err != nil {
 			s.LogError("gorpc.Server: [%s]->[%s]. Cannot send response to wire: [%s]", clientAddr, s.Addr, err)
 			return
-		}else{
-			fmt.Printf("\nCurrent buffered in rpc writter: %v\n", e.bw.Buffered())
 		}
 		wr.Response = nil
 		wr.Error = ""
