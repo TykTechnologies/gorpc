@@ -298,6 +298,19 @@ var serverMessagePool = &sync.Pool{
 	},
 }
 
+func isClientDisconnect(err error) bool {
+	return err == io.ErrUnexpectedEOF || err == io.EOF
+}
+
+func isServerStop(stopChan <-chan struct{}) bool {
+	select {
+	case <-stopChan:
+		return true
+	default:
+		return false
+	}
+}
+
 func serverReader(s *Server, r io.Reader, clientAddr string, responsesChan chan<- *serverMessage,
 	stopChan <-chan struct{}, done chan<- struct{}, enabledCompression bool, workersCh chan struct{}) {
 
@@ -314,6 +327,9 @@ func serverReader(s *Server, r io.Reader, clientAddr string, responsesChan chan<
 	var wr wireRequest
 	for {
 		if err := d.Decode(&wr); err != nil {
+			if !isClientDisconnect(err) && !isServerStop(stopChan) {
+				s.LogError("gorpc.Server: [%s]->[%s]. Cannot decode request: [%s]", clientAddr, s.Addr, err)
+			}
 			s.LogError("gorpc.Server: [%s]->[%s]. Cannot decode request: [%s]", clientAddr, s.Addr, err)
 			return
 		}
