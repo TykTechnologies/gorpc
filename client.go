@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -150,10 +152,25 @@ func (c *Client) Start() {
 		c.Dial = defaultDial
 	}
 
+	time.Sleep(time.Duration(GetEnvInt()) * time.Second)
 	for i := 0; i < c.Conns; i++ {
 		c.stopWg.Add(1)
 		go clientHandler(c)
 	}
+}
+
+func GetEnvInt() int {
+	// Read the environment variable
+	envVarValue := os.Getenv("TYK_SLEEP")
+
+	// Attempt to convert the environment variable to an integer
+	value, err := strconv.Atoi(envVarValue)
+	if err != nil {
+		// If conversion fails, use the default value
+		value = 0
+	}
+
+	return value
 }
 
 // Stop stops rpc client. Stopped client can be started again.
@@ -270,13 +287,13 @@ type AsyncResult struct {
 // CallAsync doesn't respect Client.RequestTimeout - response timeout
 // may be controlled by the caller via something like:
 //
-//     r := c.CallAsync("foobar")
-//     select {
-//     case <-time.After(c.RequestTimeout):
-//        log.Printf("rpc timeout!")
-//     case <-r.Done:
-//        processResponse(r.Response, r.Error)
-//     }
+//	r := c.CallAsync("foobar")
+//	select {
+//	case <-time.After(c.RequestTimeout):
+//	   log.Printf("rpc timeout!")
+//	case <-r.Done:
+//	   processResponse(r.Response, r.Error)
+//	}
 //
 // Don't forget starting the client with Client.Start() before
 // calling Client.CallAsync().
