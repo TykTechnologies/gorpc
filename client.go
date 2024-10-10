@@ -106,8 +106,9 @@ type Client struct {
 
 	requestsChan chan *AsyncResult
 
-	clientStopChan chan struct{}
-	stopWg         sync.WaitGroup
+	clientStopChan      chan struct{}
+	stopWg              sync.WaitGroup
+	ConnectionDialingWG sync.WaitGroup
 }
 
 // Start starts rpc client. Establishes connection to the server on Client.Addr.
@@ -270,13 +271,13 @@ type AsyncResult struct {
 // CallAsync doesn't respect Client.RequestTimeout - response timeout
 // may be controlled by the caller via something like:
 //
-//     r := c.CallAsync("foobar")
-//     select {
-//     case <-time.After(c.RequestTimeout):
-//        log.Printf("rpc timeout!")
-//     case <-r.Done:
-//        processResponse(r.Response, r.Error)
-//     }
+//	r := c.CallAsync("foobar")
+//	select {
+//	case <-time.After(c.RequestTimeout):
+//	   log.Printf("rpc timeout!")
+//	case <-r.Done:
+//	   processResponse(r.Response, r.Error)
+//	}
 //
 // Don't forget starting the client with Client.Start() before
 // calling Client.CallAsync().
