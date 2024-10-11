@@ -106,8 +106,9 @@ type Client struct {
 
 	requestsChan chan *AsyncResult
 
-	clientStopChan chan struct{}
-	stopWg         sync.WaitGroup
+	clientStopChan      chan struct{}
+	stopWg              sync.WaitGroup
+	ConnectionDialingWG sync.WaitGroup
 }
 
 // Start starts rpc client. Establishes connection to the server on Client.Addr.
@@ -152,6 +153,7 @@ func (c *Client) Start() {
 
 	for i := 0; i < c.Conns; i++ {
 		c.stopWg.Add(1)
+		c.ConnectionDialingWG.Add(1)
 		go clientHandler(c)
 	}
 }
@@ -270,13 +272,13 @@ type AsyncResult struct {
 // CallAsync doesn't respect Client.RequestTimeout - response timeout
 // may be controlled by the caller via something like:
 //
-//     r := c.CallAsync("foobar")
-//     select {
-//     case <-time.After(c.RequestTimeout):
-//        log.Printf("rpc timeout!")
-//     case <-r.Done:
-//        processResponse(r.Response, r.Error)
-//     }
+//	r := c.CallAsync("foobar")
+//	select {
+//	case <-time.After(c.RequestTimeout):
+//	   log.Printf("rpc timeout!")
+//	case <-r.Done:
+//	   processResponse(r.Response, r.Error)
+//	}
 //
 // Don't forget starting the client with Client.Start() before
 // calling Client.CallAsync().
@@ -504,13 +506,23 @@ func clientHandler(c *Client) {
 
 	var conn net.Conn
 	var err error
+	isDisconnected := true
 
 	for {
 		dialChan := make(chan struct{})
 		go func() {
 			if conn, err = c.Dial(c.Addr); err != nil {
 				c.LogError("gorpc.Client: [%s]. Cannot establish rpc connection: [%s]", c.Addr, err)
+				if !isDisconnected {
+					c.ConnectionDialingWG.Add(1)
+					isDisconnected = true
+				}
 				time.Sleep(time.Second)
+			} else {
+				c.ConnectionDialingWG.Done()
+				if isDisconnected {
+					isDisconnected = false
+				}
 			}
 			close(dialChan)
 		}()
