@@ -153,6 +153,8 @@ func (c *Client) Start() {
 
 	for i := 0; i < c.Conns; i++ {
 		c.stopWg.Add(1)
+		counter++
+		c.ConnectionDialingWG.Add(1)
 		go clientHandler(c)
 	}
 }
@@ -500,20 +502,35 @@ func (e *ClientError) Error() string {
 	return e.err.Error()
 }
 
+var counter int
+
 func clientHandler(c *Client) {
 	defer c.stopWg.Done()
 
 	var conn net.Conn
 	var err error
+	isDisconnected := true
 
 	for {
 		dialChan := make(chan struct{})
 		go func() {
 			if conn, err = c.Dial(c.Addr); err != nil {
-				c.ConnectionDialingWG.Add(1)
 				c.LogError("gorpc.Client: [%s]. Cannot establish rpc connection: [%s]", c.Addr, err)
+				if !isDisconnected {
+					c.ConnectionDialingWG.Add(1)
+					counter = counter + 1
+					isDisconnected = true
+				}
 				time.Sleep(time.Second)
+			} else {
+				fmt.Println("connection succeeded")
+				c.ConnectionDialingWG.Done()
+				counter = counter - 1
+				if isDisconnected {
+					isDisconnected = false
+				}
 			}
+			fmt.Println("counter: ", counter)
 			close(dialChan)
 		}()
 
