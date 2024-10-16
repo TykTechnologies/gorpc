@@ -106,8 +106,8 @@ type Client struct {
 
 	requestsChan chan *AsyncResult
 
-	clientStopChan      chan struct{}
-	stopWg              sync.WaitGroup
+	clientStopChan	  chan struct{}
+	stopWg			  sync.WaitGroup
 	ConnectionDialingWG sync.WaitGroup
 }
 
@@ -226,7 +226,7 @@ func getClientTimeoutError(c *Client, timeout time.Duration) error {
 	c.LogError("%s", err)
 	return &ClientError{
 		Timeout: true,
-		err:     err,
+		err:	 err,
 	}
 }
 
@@ -260,8 +260,8 @@ type AsyncResult struct {
 	Done <-chan struct{}
 
 	request interface{}
-	t       time.Time
-	done    chan struct{}
+	t	   time.Time
+	done	chan struct{}
 }
 
 // CallAsync starts async rpc call.
@@ -304,7 +304,7 @@ func (c *Client) callAsync(request interface{}, skipResponse bool) (ar *AsyncRes
 		c.LogError("%s", err)
 		err = &ClientError{
 			Overflow: true,
-			err:      err,
+			err:	  err,
 		}
 		return nil, err
 	}
@@ -314,8 +314,8 @@ func (c *Client) callAsync(request interface{}, skipResponse bool) (ar *AsyncRes
 //
 // Batch may be created via Client.NewBatch().
 type Batch struct {
-	c       *Client
-	ops     []*BatchResult
+	c	   *Client
+	ops	 []*BatchResult
 	opsLock sync.Mutex
 }
 
@@ -333,8 +333,8 @@ type BatchResult struct {
 	Done <-chan struct{}
 
 	request interface{}
-	ctx     interface{}
-	done    chan struct{}
+	ctx	 interface{}
+	done	chan struct{}
 }
 
 // NewBatch creates new RPC batch.
@@ -502,40 +502,40 @@ func (e *ClientError) Error() string {
 }
 
 func clientHandler(c *Client) {
-    defer c.stopWg.Done()
+	defer c.stopWg.Done()
 
-    var conn net.Conn
-    var err error
-    connectionWGDoneCalled := false
+	var conn net.Conn
+	var err error
+	connectionWGDoneCalled := false
 
-    for {
-        dialChan := make(chan struct{})
-        go func() {
-            if conn, err = c.Dial(c.Addr); err != nil {
-                c.LogError("gorpc.Client: [%s]. Cannot establish rpc connection: [%s]", c.Addr, err)
-                time.Sleep(time.Second)
-            } else {
-                if !connectionWGDoneCalled {
-                    c.ConnectionDialingWG.Done()
-                    connectionWGDoneCalled = true
-                }
-            }
-            close(dialChan)
-        }()
+	for {
+		dialChan := make(chan struct{})
+		go func() {
+			if conn, err = c.Dial(c.Addr); err != nil {
+				c.LogError("gorpc.Client: [%s]. Cannot establish rpc connection: [%s]", c.Addr, err)
+				time.Sleep(time.Second)
+			} else {
+				if !connectionWGDoneCalled {
+					c.ConnectionDialingWG.Done()
+					connectionWGDoneCalled = true
+				}
+			}
+			close(dialChan)
+		}()
 
-        select {
-        case <-c.clientStopChan:
-            return
-        case <-dialChan:
-            c.Stats.incDialCalls()
-        }
+		select {
+		case <-c.clientStopChan:
+			return
+		case <-dialChan:
+			c.Stats.incDialCalls()
+		}
 
-        if err != nil {
-            c.Stats.incDialErrors()
-            continue
-        }
-        clientHandleConnection(c, conn)
-    }
+		if err != nil {
+			c.Stats.incDialErrors()
+			continue
+		}
+		clientHandleConnection(c, conn)
+	}
 }
 
 
@@ -592,7 +592,7 @@ func clientHandleConnection(c *Client, conn net.Conn) {
 		c.LogError("%s", err)
 		err = &ClientError{
 			Connection: true,
-			err:        err,
+			err:		err,
 		}
 	}
 	for _, m := range pendingRequests {
@@ -714,7 +714,7 @@ func clientReader(c *Client, r io.Reader, pendingRequests map[uint64]*AsyncResul
 		if wr.Error != "" {
 			m.Error = &ClientError{
 				Server: true,
-				err:    fmt.Errorf("gorpc.Client: [%s]. Server error: [%s]", c.Addr, wr.Error),
+				err:	fmt.Errorf("gorpc.Client: [%s]. Server error: [%s]", c.Addr, wr.Error),
 			}
 			wr.Error = ""
 		}
