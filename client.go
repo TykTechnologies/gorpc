@@ -502,45 +502,42 @@ func (e *ClientError) Error() string {
 }
 
 func clientHandler(c *Client) {
-	defer c.stopWg.Done()
+    defer c.stopWg.Done()
 
-	var conn net.Conn
-	var err error
-	isDisconnected := true
+    var conn net.Conn
+    var err error
+    connectionWGDoneCalled := false
 
-	for {
-		dialChan := make(chan struct{})
-		go func() {
-			if conn, err = c.Dial(c.Addr); err != nil {
-				c.LogError("gorpc.Client: [%s]. Cannot establish rpc connection: [%s]", c.Addr, err)
-				if !isDisconnected {
-					c.ConnectionDialingWG.Add(1)
-					isDisconnected = true
-				}
-				time.Sleep(time.Second)
-			} else {
-				c.ConnectionDialingWG.Done()
-				if isDisconnected {
-					isDisconnected = false
-				}
-			}
-			close(dialChan)
-		}()
+    for {
+        dialChan := make(chan struct{})
+        go func() {
+            if conn, err = c.Dial(c.Addr); err != nil {
+                c.LogError("gorpc.Client: [%s]. Cannot establish rpc connection: [%s]", c.Addr, err)
+                time.Sleep(time.Second)
+            } else {
+                if !connectionWGDoneCalled {
+                    c.ConnectionDialingWG.Done()
+                    connectionWGDoneCalled = true
+                }
+            }
+            close(dialChan)
+        }()
 
-		select {
-		case <-c.clientStopChan:
-			return
-		case <-dialChan:
-			c.Stats.incDialCalls()
-		}
+        select {
+        case <-c.clientStopChan:
+            return
+        case <-dialChan:
+            c.Stats.incDialCalls()
+        }
 
-		if err != nil {
-			c.Stats.incDialErrors()
-			continue
-		}
-		clientHandleConnection(c, conn)
-	}
+        if err != nil {
+            c.Stats.incDialErrors()
+            continue
+        }
+        clientHandleConnection(c, conn)
+    }
 }
+
 
 func clientHandleConnection(c *Client, conn net.Conn) {
 	if c.OnConnect != nil {
