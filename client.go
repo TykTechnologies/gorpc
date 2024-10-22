@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -151,11 +153,26 @@ func (c *Client) Start() {
 		c.Dial = defaultDial
 	}
 
+	time.Sleep(time.Duration(GetEnvInt()) * time.Second)
 	for i := 0; i < c.Conns; i++ {
 		c.stopWg.Add(1)
 		c.connectionDialingWG.Add(1)
 		go clientHandler(c)
 	}
+}
+
+func GetEnvInt() int {
+	// Read the environment variable
+	envVarValue := os.Getenv("TYK_SLEEP")
+
+	// Attempt to convert the environment variable to an integer
+	value, err := strconv.Atoi(envVarValue)
+	if err != nil {
+		// If conversion fails, use the default value
+		value = 0
+	}
+
+	return value
 }
 
 // Stop stops rpc client. Stopped client can be started again.
