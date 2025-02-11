@@ -46,13 +46,21 @@ type OnConnectFunc func(rwc net.Conn) (net.Conn, string, error)
 // LoggerFunc is an error logging function to pass to gorpc.SetErrorLogger().
 type LoggerFunc func(format string, args ...interface{})
 
-var errorLogger = LoggerFunc(log.Printf)
+var errorLoggerHandle = LoggerFunc(log.Printf)
+var errorLoggerMu sync.Mutex
+var errorLogger = func(format string, args ...interface{}) {
+	errorLoggerMu.Lock()
+	errorLoggerHandle(format, args...)
+	errorLoggerMu.Unlock()
+}
 
 // SetErrorLogger sets the given error logger to use in gorpc.
 //
 // By default log.Printf is used for error logging.
 func SetErrorLogger(f LoggerFunc) {
-	errorLogger = f
+	errorLoggerMu.Lock()
+	errorLoggerHandle = f
+	errorLoggerMu.Unlock()
 }
 
 // NilErrorLogger discards all error messages.
