@@ -106,9 +106,9 @@ type Client struct {
 
 	requestsChan chan *AsyncResult
 
-	clientStopChan      chan struct{}
-	stopWg              sync.WaitGroup
-	connectionDialingWG sync.WaitGroup
+	clientStopChan  chan struct{}
+	stopWg          sync.WaitGroup
+	ClientReadyChan chan struct{}
 }
 
 // Start starts rpc client. Establishes connection to the server on Client.Addr.
@@ -143,6 +143,7 @@ func (c *Client) Start() {
 
 	c.requestsChan = make(chan *AsyncResult, c.PendingRequests)
 	c.clientStopChan = make(chan struct{})
+	c.ClientReadyChan = make(chan struct{})
 
 	if c.Conns <= 0 {
 		c.Conns = 1
@@ -153,7 +154,6 @@ func (c *Client) Start() {
 
 	for i := 0; i < c.Conns; i++ {
 		c.stopWg.Add(1)
-		c.connectionDialingWG.Add(1)
 		go clientHandler(c)
 	}
 }
@@ -308,12 +308,6 @@ func (c *Client) callAsync(request interface{}, skipResponse bool) (ar *AsyncRes
 		}
 		return nil, err
 	}
-}
-
-// WaitForConnection waits for the waitgroup to be finalized
-// indicating that connections has been established
-func (c *Client) WaitForConnection() {
-	c.connectionDialingWG.Wait()
 }
 
 // Batch allows grouping and executing multiple RPCs in a single batch.
@@ -513,9 +507,6 @@ func clientHandler(c *Client) {
 	var conn net.Conn
 	var err error
 
-	var mu sync.Mutex
-	connectionWGDoneCalled := false
-
 	for {
 		dialChan := make(chan struct{})
 		go func() {
@@ -523,12 +514,10 @@ func clientHandler(c *Client) {
 				c.LogError("gorpc.Client: [%s]. Cannot establish rpc connection: [%s]", c.Addr, err)
 				time.Sleep(time.Second)
 			} else {
-				mu.Lock()
-				if !connectionWGDoneCalled {
-					c.connectionDialingWG.Done()
-					connectionWGDoneCalled = true
+				select {
+				case c.ClientReadyChan <- struct{}{}:
+				default:
 				}
-				mu.Unlock()
 			}
 			close(dialChan)
 		}()
